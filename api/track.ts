@@ -7,14 +7,15 @@ type EventBody = {
   initData?: string;
 };
 
-const ALLOWED_EVENTS = new Set(["app_opened", "game_opened", "turn_completed", "booster_used", "game_finished"]);
+const ALLOWED_EVENTS = new Set(["app_opened", "game_opened", "game_finished"]);
 const MAX_AGE_SECONDS = 60 * 60 * 24;
 
 function verifyTelegramInitData(initData: string, botToken: string) {
   const params = new URLSearchParams(initData);
   const receivedHash = params.get("hash");
   const authDate = Number(params.get("auth_date"));
-  if (!receivedHash || !authDate || Math.floor(Date.now() / 1000) - authDate > MAX_AGE_SECONDS) return null;
+  const age = Math.floor(Date.now() / 1000) - authDate;
+  if (!receivedHash || !authDate || age < 0 || age > MAX_AGE_SECONDS) return null;
 
   params.delete("hash");
   const dataCheckString = [...params.entries()]
@@ -57,8 +58,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const labels: Record<string, string> = {
     app_opened: "открыла приложение",
     game_opened: "зашла в игру",
-    turn_completed: "сделала ход",
-    booster_used: "использовала усиление",
     game_finished: "завершила игру",
   };
   const text = `✨ Dasha Love Bot\nИгрок: ${name}\n${labels[body.event] ?? body.event}${details ? `\n${details}` : ""}`;
