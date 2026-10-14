@@ -7,7 +7,7 @@ type EventBody = {
   initData?: string;
 };
 
-const ALLOWED_EVENTS = new Set(["app_opened", "game_opened", "turn_completed", "booster_used"]);
+const ALLOWED_EVENTS = new Set(["app_opened", "game_opened", "turn_completed", "booster_used", "game_finished"]);
 const MAX_AGE_SECONDS = 60 * 60 * 24;
 
 function verifyTelegramInitData(initData: string, botToken: string) {
@@ -54,7 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .map(([key, value]) => `${key}: ${String(value).slice(0, 80)}`)
     .join("\n");
   const name = user.username ? `@${user.username}` : user.first_name ?? `ID ${user.id}`;
-  const text = `✨ Dasha Love Bot\nИгрок ${name} открыл приложение\nСобытие: ${body.event}${details ? `\n${details}` : ""}`;
+  const labels: Record<string, string> = {
+    app_opened: "открыла приложение",
+    game_opened: "зашла в игру",
+    turn_completed: "сделала ход",
+    booster_used: "использовала усиление",
+    game_finished: "завершила игру",
+  };
+  const text = `✨ Dasha Love Bot\nИгрок: ${name}\n${labels[body.event] ?? body.event}${details ? `\n${details}` : ""}`;
 
   const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
