@@ -43,14 +43,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ownerId = process.env.OWNER_TELEGRAM_ID;
   if (!botToken || !ownerId) return res.status(503).json({ ok: false, error: "tracking_not_configured" });
 
-  const body = (req.body ?? {}) as EventBody;
-  if (!body.initData || !body.event || !ALLOWED_EVENTS.has(body.event)) return res.status(400).json({ ok: false, error: "invalid_event" });
-  const user = verifyTelegramInitData(body.initData, botToken);
+  const body = req.body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return res.status(400).json({ ok: false, error: "invalid_event" });
+  const eventBody = body as EventBody;
+  if (typeof eventBody.initData !== "string" || eventBody.initData.length === 0 || eventBody.initData.length > 8192 || typeof eventBody.event !== "string" || !ALLOWED_EVENTS.has(eventBody.event)) return res.status(400).json({ ok: false, error: "invalid_event" });
+  if (eventBody.payload !== undefined && (!eventBody.payload || typeof eventBody.payload !== "object" || Array.isArray(eventBody.payload))) return res.status(400).json({ ok: false, error: "invalid_payload" });
+  const user = verifyTelegramInitData(eventBody.initData, botToken);
   if (!user) return res.status(401).json({ ok: false, error: "invalid_telegram_data" });
 
-  const payload = body.payload ?? {};
+  const payload = eventBody.payload ?? {};
   const details = Object.entries(payload)
-    .filter(([, value]) => ["string", "number", "boolean"].includes(typeof value))
+    .filter(([key, value]) => key.length <= 40 && ["string", "number", "boolean"].includes(typeof value))
     .slice(0, 8)
     .map(([key, value]) => `${key}: ${String(value).slice(0, 80)}`)
     .join("\n");
@@ -60,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     game_opened: "зашла в игру",
     game_finished: "завершила игру",
   };
-  const text = `✨ Dasha Love Bot\nИгрок: ${name}\n${labels[body.event] ?? body.event}${details ? `\n${details}` : ""}`;
+  const text = `✨ Dasha Love Bot\nИгрок: ${name}\n${labels[eventBody.event] ?? eventBody.event}${details ? `\n${details}` : ""}`;
 
   const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
